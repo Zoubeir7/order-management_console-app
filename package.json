@@ -1,0 +1,17 @@
+{
+  "name": "order-mennagement",
+  "version": "1.0.0",
+  "description": "cette application permet de gerer des commandes, les produits et clients ",
+  "main": "app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Zoubeir Ba",
+  "license": "ISC",
+  "dependencies": {
+    "inquirer": "^10.2.2",
+    "mysql2": "^3.11.0",
+    "readline-sync": "^1.4.10"
+  }
+}
