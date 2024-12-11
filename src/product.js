@@ -1,117 +1,100 @@
-const connPool = require("./config/db");
+const pool = require('./config/db');
 
-function addProduct(
-    product_name,
-    product_description,
-    price,
-    stock,
-    category,
-    barcode,
-    status
-) {
+async function productIdExists(id) {
+    const connection = await pool.getConnection();
     try {
-        // Vérifier si le code-barres existe déjà
-        const checkBarcodeQuery = "SELECT COUNT(*) AS count FROM products WHERE barcode = ?";
-        connPool.query(checkBarcodeQuery, [barcode], (err, results) => {
-            if (err) {
-                console.error("Erreur lors de la vérification du code-barres:", err.message);
-                return;
-            }
-
-            if (results[0].count > 0) {
-                console.log("Le code-barres existe déjà. Veuillez utiliser un code-barres unique.");
-                return;
-            }
-
-            const query =
-                "INSERT INTO products (product_name, product_description, price, stock, category, barcode, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
-            connPool.query(
-                query,
-                [product_name, product_description, price, stock, category, barcode, status],
-                (err, result) => {
-                    if (err) {
-                        console.error("Erreur lors de l'ajout du produit:", err.message);
-                        return;
-                    }
-                    console.log("Produit ajouté avec succès! ID:", result.insertId);
-                }
-            );
-        });
+        const [rows] = await connection.execute('SELECT 1 FROM products WHERE id = ?', [id]);
+        return rows.length > 0;
     } catch (error) {
-        console.error("Erreur inattendue:", error.message);
+        console.log(error.message);
+    } finally {
+        connection.release();
     }
 }
 
-function listProduct() {
+async function createProduct(product) {
+    const connection = await pool.getConnection();
     try {
-        const query = "SELECT * FROM products";
-        connPool.query(query, (err, results) => {
-            if (err) {
-                console.error("Erreur lors de la récupération des produits:", err.message);
-                return;
-            }
-            console.log("Liste des produits:", results);
-        });
+        const query = `
+            INSERT INTO products 
+            (product_name, product_description, stock, price, category, barcode, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `;
+        const [result] = await connection.execute(query, [
+            product.product_name, product.product_description, product.stock, product.price,
+            product.category, product.barcode, product.status
+        ]);
+        console.log('Produit ajouté avec succès.');
+        return result.insertId;
     } catch (error) {
-        console.error("Erreur inattendue:", error.message);
+        if (error.code === 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD') {
+            console.log('Veuillez vérifier les valeurs saisies, vous avez entré une valeur invalide.');
+        } else {
+            console.error("Erreur lors de l'insertion du produit :", error.message);
+        }
+    } finally {
+        connection.release();
     }
 }
 
-function updateProduct(
-    id,
-    product_name,
-    product_description,
-    price,
-    stock,
-    category,
-    barcode,
-    status
-) {
+async function updateProduct(id, product) {
+    const connection = await pool.getConnection();
     try {
-        const query =
-            "UPDATE products SET product_name = ?, product_description = ?, price = ?, stock = ?, category = ?, barcode = ?, status = ? WHERE id = ?";
-        connPool.query(
-            query,
-            [product_name, product_description, price, stock, category, barcode, status, id],
-            (err, result) => {
-                if (err) {
-                    console.error("Erreur lors de la mise à jour du produit:", err.message);
-                    return;
-                }
-                if (result.affectedRows === 0) {
-                    console.log("Aucun produit trouvé avec cet ID.");
-                } else {
-                    console.log("Produit mis à jour avec succès!");
-                }
-            }
-        );
+        const query = `
+            UPDATE products 
+            SET product_name = ?, product_description = ?, stock = ?, price = ?, category = ?, barcode = ?, status = ?  
+            WHERE id = ?
+        `;
+        await connection.execute(query, [
+            product.product_name, product.product_description, product.stock, product.price,
+            product.category, product.barcode, product.status, id
+        ]);
+        console.log(`Produit avec id: ${id} modifié avec succès.`);
     } catch (error) {
-        console.error("Erreur inattendue:", error.message);
+        if (error.code === 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD') {
+            console.log('Veuillez vérifier les valeurs saisies, vous avez entré une valeur invalide.');
+        } else {
+            console.error("Erreur lors de la modification du produit :", error.message);
+        }
+    } finally {
+        connection.release();
     }
 }
 
-function deleteProduct(id) {
+async function deleteProduct(id) {
+    const connection = await pool.getConnection();
     try {
-        const query = "DELETE FROM products WHERE id = ?";
-        connPool.query(query, [id], (err, result) => {
-            if (err) {
-                console.error("Erreur lors de la suppression du produit:", err.message);
-                return;
-            }
-            if (result.affectedRows === 0) {
-                console.log("Aucun produit trouvé avec cet ID.");
-            } else {
-                console.log("Produit supprimé avec succès");
-            }
-        });
+        const query = 'DELETE FROM products WHERE id = ?';
+        await connection.execute(query, [id]);
+        console.log(`Produit avec id: ${id} supprimé.`);
     } catch (error) {
-        console.error("Erreur inattendue:", error.message);
+        if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+            console.log("Impossible de supprimer le produit car il est lié à des commandes existantes.");
+        } else {
+            console.error("Erreur lors de la suppression du produit :", error.message);
+        }
+    } finally {
+        connection.release();
+    }
+}
+
+async function listProducts() {
+    const connection = await pool.getConnection();
+    try {
+        const query = 'SELECT * FROM products';
+        const [rows] = await connection.execute(query);
+        return rows;
+    } catch (error) {
+        console.log(error.message);
+    } finally {
+        connection.release();
     }
 }
 
 module.exports = {
-    addProduct,
-    listProduct,
+    createProduct,
     updateProduct,
-    deleteProduct
+    deleteProduct,
+    listProducts,
+    productIdExists
 };

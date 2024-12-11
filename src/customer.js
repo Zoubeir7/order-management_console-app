@@ -1,102 +1,76 @@
-const connPool = require("./config/db");
+const pool = require('./config/db');
 
-function validateName(customer_name) {
-    const regex = /^[A-Za-z\s]+$/;
-    if (!regex.test(customer_name)) {
-        throw new Error(
-            "Le nom ne doit pas contenir de chiffres ou de caractères spéciaux."
-        );
-    }
-}
-
-function validateEmail(email) {
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!regex.test(email)) {
-        throw new Error("Format d'email invalide.");
-    }
-}
-
-function addCustomer(customer_name, address, email, phone) {
+async function clientIdExists(id) {
+    const connection = await pool.getConnection();
     try {
-        validateName(customer_name);
-        validateEmail(email);
-
-        const query =
-            "INSERT INTO customers (customer_name, address, email, phone) VALUES (?, ?, ?, ?)";
-        connPool.query(query, [customer_name, address, email, phone], (err, result) => {
-            if (err) {
-                console.error("Erreur lors de l'ajout du client:", err.message);
-                return;
-            }
-            console.log("Client ajouté avec succès! ID:", result.insertId);
-        });
-    } catch (error) {
-        console.error("Erreur inattendue:", error.message);
+        const [rows] = await connection.execute('SELECT 1 FROM customers WHERE id = ?', [id]);
+        return rows.length > 0;
+    } finally {
+        connection.release();
     }
 }
 
-function listCustomer() {
+async function createClient(client) {
+    const connection = await pool.getConnection();
     try {
-        const query = "SELECT * FROM customers";
-        connPool.query(query, (err, results) => {
-            if (err) {
-                console.error(
-                    "Erreur lors de la récupération des clients:",
-                    err.message
-                );
-                return;
-            }
-            console.log("Liste des clients:", results);
-        });
+        const query = 'INSERT INTO customers (customer_name, adress, email, phone) VALUES (?, ?, ?, ?)';
+        const [result] = await connection.execute(query, [client.customer_name, client.adress, client.email, client.phone]);
+        console.log(`Client ajouté avec succès.`);
+        return result.insertId;
     } catch (error) {
-        console.error("Erreur inattendue:", error.message);
+        console.log("Erreur lors de l'insertion du client :", error.message);
+    } finally {
+        connection.release();
     }
 }
 
-function updateCustomer(id, customer_name, address, email, phone) {
+async function updateClient(id, client) {
+    const connection = await pool.getConnection();
     try {
-        validateName(customer_name);
-        validateEmail(email);
-
-        const query =
-            "UPDATE customers SET customer_name = ?, address = ?, email = ?, phone = ? WHERE id = ?";
-        connPool.query(query, [customer_name, address, email, phone, id], (err, result) => {
-            if (err) {
-                console.error("Erreur lors de la mise à jour du client:", err.message);
-                return;
-            }
-            if (result.affectedRows === 0) {
-                console.log("Aucun client trouvé avec cet ID.");
-            } else {
-                console.log("Client mis à jour avec succès!");
-            }
-        });
+        const query = 'UPDATE customers SET customer_name = ?, adress = ?, email = ?, phone = ? WHERE id = ?';
+        await connection.execute(query, [client.customer_name, client.adress, client.email, client.phone, id]);
+        console.log(`Client avec id: ${id} modifié avec succès.`);
     } catch (error) {
-        console.error("Erreur inattendue:", error.message);
+        console.log("Erreur lors de la modification du client :", error.message);
+    } finally {
+        connection.release();
     }
 }
 
-function deleteCustomer(id) {
+async function deleteClient(id) {
+    const connection = await pool.getConnection();
     try {
-        const query = "DELETE FROM customers WHERE id = ?";
-        connPool.query(query, [id], (err, result) => {
-            if (err) {
-                console.error("Erreur lors de la suppression du client:", err.message);
-                return;
-            }
-            if (result.affectedRows === 0) {
-                console.log("Aucun client trouvé avec cet ID.");
-            } else {
-                console.log("Client supprimé avec succès!");
-            }
-        });
+        const query = 'DELETE FROM customers WHERE id = ?';
+        await connection.execute(query, [id]);
+        console.log(`Client avec id: ${id} supprimé.`);
     } catch (error) {
-        console.error("Erreur inattendue:", error.message);
+        if (error.code === "ER_ROW_IS_REFERENCED_2") {
+            console.log("Impossible de supprimer le client car il est lié à des commandes existantes.");
+        } else {
+            console.error("Erreur lors de la suppression du client :", error.message);
+        }
+    } finally {
+        connection.release();
     }
 }
+
+async function listClients() {
+    const connection = await pool.getConnection();
+    try {
+        const query = 'SELECT * FROM customers';
+        const [rows] = await connection.execute(query);
+        return rows;
+    } catch (error) {
+        console.log(error.message);
+    } finally {
+        connection.release();
+    }
+}
+
 module.exports = {
-    addCustomer,
-    listCustomer,
-    updateCustomer,
-    deleteCustomer
+    createClient,
+    updateClient,
+    deleteClient,
+    listClients,
+    clientIdExists
 };

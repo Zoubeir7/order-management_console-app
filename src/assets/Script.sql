@@ -40,7 +40,7 @@ CREATE TABLE order_details(
 CREATE TABLE payments(
      id INT PRIMARY KEY AUTO_INCREMENT,
      date DATETIME,
-	 amount DECIMAL(10,2)NOT NULL,
+	  amount DECIMAL(10,2)NOT NULL,
      payment_method VARCHAR(50) NOT NULL,
      purchase_order_id INT NOT NULL,
 	 FOREIGN KEY(purchase_order_id) REFERENCES PurchaseOrder(id)
